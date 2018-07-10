@@ -1,0 +1,32 @@
+{
+  "name": "rest2static",
+  "description": "Pull data from REST API and generate static HTML content.",
+  "version": "0.0.2",
+  "homepage": "https://github.com/thepian/rest2static",
+  "main": "plan.js",
+  "author": {
+    "name": "Henrik Vendelbo",
+    "email": "henrik@thepia.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/thepian/rest2static.git"
+  },
+  "license": "MIT",
+  "readmeFilename": "README.md",
+  "scripts": {
+    "test": "jasmine-node *.spec.js"
+  },
+  "bin": {
+    "rest2static": "./bin/rest2static.js"
+  },
+  "dependencies": {
+    "handlebars": "^4.0.11",
+    "progress": "^2.0.0",
+    "request": "^2.87.0"
+  },
+  "devDependencies": {
+    "jasmine": "^3.1.0",
+    "jasmine-node": "^1.15.0"
+  }
+}
