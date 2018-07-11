@@ -23,5 +23,25 @@ var bar = new ProgressBar('Fetching data [:bar] :rate/bps :percent :etas', {
   total: 10
 });
 bar.tick(0);
-reqPlan.forEach(req => req());
+reqPlan.makePages();
+reqPlan.makeSitemap();
+reqPlan.makeIndex();
 console.log('\n');
+
+//DONE generate sitemap if configured..
+//DONE generate list pages option...
+//TODO map to multiple names
+//TODO progressbar
+//TODO prefixing URLs
+//TODO parse error details
+//TODO debugging README
+//TODO plan testing
+//TODO component / route for static pages, route redirect or manual? login needed. Redirect if already logged in
+//TODO document SEO principle
+//TODO integrated production build
+//TODO document howto static-generate
+//TODO extracted base style
+//TODO multilang URLs
+//TODO responsive layout
+//TODO performance audit
+//TODO server mapping dist/de dist/fr
