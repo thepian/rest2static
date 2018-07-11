@@ -59,8 +59,8 @@ function collectingEmitter(spec, parent) {
 function mappingEmitter(spec, parent) {
     return (result, seed, data) => {
         const collected = Object.assign({}, seed);
-        collect(spec, collected, data, result);
-        result.push(collected);
+        const apply = collect(spec, collected, data, result);
+        if (apply) result.push(collected);
         return result;
     };
 }
@@ -72,25 +72,57 @@ function subMappingEmitter(spec, parent) {
   };
 }
 
+// !a b c{}="haha"
+function parseStringValue(expr, value, lookupValue) {
+    const match = /([!])?([\w\s\._-]+)?(\{.*\})?(=.*)?/.exec(expr);
+    if (!match) throw new Error(`Couldn't parse ${expr} with ${value}`);
+    // if value falsy, skip the entry (post ! mapping)
+    const apply = match[1] === "!" ? !value : true;
+    const names = match[2] ? match[2].split(" ") : [];
+    const rules = match[3]; // future support
+    value = value || (match[4] && lookupValue(match[4].substr(1)))
+
+    return {
+        names,
+        apply,
+        expr,
+        value
+    };
+}
+
+const KEYWORDS = {
+    "null": null,
+    "false": false,
+    "true": true
+};
+
 function collect(spec, collected, data, result) {
-  Object.keys(spec).forEach(key => {
-    switch(typeof spec[key]) {
-      // string: name to translate key to
-      case "string":
-        const ckey = spec[key];
-        if (ckey === "!") {
-          // if value falsy, skip the entry (post ! mapping)
-        } else if (typeof ckey === "string") {
-          collected[ckey] = data[key];
+    let applyData = true;
+    Object.keys(spec).forEach(key => {
+        switch(typeof spec[key]) {
+        // string: name to translate key to
+        case "string":
+            const {apply,names,value} = parseStringValue(spec[key], data[key], expr => {
+                if (expr.charAt(0) === '"' || expr.charAt(0) === "'") return expr.substr(1,expr.length-2);
+                if (Number(expr) == expr) return Number(expr);
+                return data[expr] || KEYWORDS[expr];
+            });
+            names.forEach(name => {
+                collected[name] = value;
+            });
+            if (!apply) {
+                applyData = false;
+            }
         }
-    }
-  });
-  Object.keys(spec).forEach(key => {
-      // sub object: navigate down
-      if (typeof spec[key] === "object") {
-          spec[key][emitter](result, collected, data[key])
-      }
-  });
+    });
+    Object.keys(spec).forEach(key => {
+        // sub object: navigate down
+        if (typeof spec[key] === "object" && typeof data[key] === "object") {
+            spec[key][emitter](result, collected, data[key])
+        }
+    });
+
+    return applyData;
 }
 
 function specHasArray(spec) {

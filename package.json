@@ -1,7 +1,7 @@
 {
   "name": "rest2static",
   "description": "Pull data from REST API and generate static HTML content.",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "homepage": "https://github.com/thepian/rest2static",
   "main": "plan.js",
   "author": {
