@@ -9,6 +9,7 @@ module.exports = function plan(config, request) {
     let root = ".";
     let pages = []; // pages generated
     let awaiting = []; // promises for requests to complete
+    const tickers = []; // callbacks when progress is made
 
     if (config.partials) {
         const names = fs.readdirSync(config.partials).filter(name => name.endsWith('.hbs') || name.endsWith('.handlebars'));
@@ -52,14 +53,18 @@ module.exports = function plan(config, request) {
         return { filepath, url: expanded };
     }
 
-    const requestors = Object.keys(config).filter(restUrl => restUrl.startsWith('https:')).map(restUrl => {
-        const { method, url:urlTemplate, template, scan } = config[restUrl];
+    function tick(data) {
+        tickers.forEach(ticker => ticker(data));
+    }
+
+    const requestors = Object.keys(config).filter(restUrl => restUrl.startsWith('https:')).map((restUrl,indexRequest) => {
+        const { method, url:urlTemplate, template, scan, name } = config[restUrl];
         const handlebarsSource = fs.readFileSync(template, { encoding: 'utf8'});
         const templateFn = handlebars.compile(handlebarsSource);
 
         return function fetchAndGenerate() {
             awaiting.push(new Promise((resolve, reject) => {
-              request.get(restUrl, {}, (error, response, body) => {
+                request.get(restUrl, {}, (error, response, body) => {
                   if (error) {
                     console.error('oops', error);
                   }
@@ -71,14 +76,19 @@ module.exports = function plan(config, request) {
                           const data = Object.assign({filepath,url}, extraData, entry);
                           pages.push(data);
                           mkdirp.sync(path.dirname(filepath));
-                          fs.writeFile(filepath, templateFn(data), { encoding: 'utf8'}, error => { if (error) console.error('failed to save', filepath, error); });
+                          fs.writeFile(filepath, templateFn(data), { encoding: 'utf8'}, 
+                            error => { 
+                                if (error) console.error('failed to save', filepath, error); 
+                                //TODO completed promise array
+                            });
                       });
+                      tick({ progress: indexRequest+1, msg: name||restUrl });
                       resolve(flat);
                   }
                   catch(err) {
                       reject(err);
                       console.error(err.message, 'for', restUrl);
-                      // console.error(err);
+                      // console.error(err); bar.interrupt()
                   }
               });
             }));
@@ -87,8 +97,12 @@ module.exports = function plan(config, request) {
 
     return {
       requestors,
+      total: requestors.length + 3,
       pages,
       awaiting,
+      set ticker(ticker) {
+        tickers.push(ticker);
+      },
 
       makePages() {
         requestors.forEach(req => req())
@@ -103,7 +117,11 @@ module.exports = function plan(config, request) {
             const {filepath,url} = renderLocation(config.sitemap.url, {});
             const data = Object.assign({filepath,url,pages,changefreq}, extraData);
             mkdirp.sync(path.dirname(filepath));
-            fs.writeFile(filepath, templateFn(data), { encoding: 'utf8'}, error => { if (error) console.error('failed to save', filepath, error); });
+            fs.writeFile(filepath, templateFn(data), { encoding: 'utf8'}, 
+                error => { 
+                    if (error) console.error('failed to save', filepath, error); 
+                    tick({ progress: 1, msg: 'Sitemap.' });
+                });
           });
         }
       },
@@ -111,12 +129,16 @@ module.exports = function plan(config, request) {
       makeIndex() {
         if (config.index) {
           Promise.all(awaiting).then(() => {
-          const handlebarsSource = fs.readFileSync(config.index.template, { encoding: 'utf8'});
-          const templateFn = handlebars.compile(handlebarsSource);
-          const {filepath,url} = renderLocation(config.index.url, {});
-          const data = Object.assign({filepath,url,pages}, extraData);
-          mkdirp.sync(path.dirname(filepath));
-          fs.writeFile(filepath, templateFn(data), { encoding: 'utf8'}, error => { if (error) console.error('failed to save', filepath, error); });
+            const handlebarsSource = fs.readFileSync(config.index.template, { encoding: 'utf8'});
+            const templateFn = handlebars.compile(handlebarsSource);
+            const {filepath,url} = renderLocation(config.index.url, {});
+            const data = Object.assign({filepath,url,pages}, extraData);
+            mkdirp.sync(path.dirname(filepath));
+            fs.writeFile(filepath, templateFn(data), { encoding: 'utf8'}, 
+                error => { 
+                    if (error) console.error('failed to save', filepath, error); 
+                    tick({ progress: 1, msg: 'Index.' });
+                });
           });
         }
       }

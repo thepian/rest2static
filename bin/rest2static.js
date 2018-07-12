@@ -16,29 +16,24 @@ if (typeof config === 'string') {
 const reqPlan = plan(config, request);
 
 
-var bar = new ProgressBar('Fetching data [:bar] :rate/bps :percent :etas', {
+var bar = new ProgressBar('Generating site [:bar] :percent', { //  :rate/bps  :etas
   complete: '=',
   incomplete: ' ',
   width: 20,
-  total: 10
+  total: reqPlan.total
 });
 bar.tick(0);
+reqPlan.ticker = (data) => {
+  if (data.msg) {
+    bar.interrupt(data.msg);
+  }
+  if (data.progress) {
+    bar.tick();
+  }
+};
 reqPlan.makePages();
 reqPlan.makeSitemap();
 reqPlan.makeIndex();
-console.log('\n');
 
-//TODO progressbar
 //TODO prefixing URLs "url": "url{'prefix':'https://portalwebapi.swisslex.ch/'}"
 //TODO parse error details
-//TODO plan testing
-//TODO component / route for static pages, route redirect or manual? login needed. Redirect if already logged in
-//TODO document SEO principle
-//TODO integrated production build
-//TODO document howto static-generate
-//TODO extracted base style
-//TODO multilang URLs
-//TODO responsive layout
-//TODO performance audit
-//TODO server mapping dist/de dist/fr
-//TODO page in line with frontpage
