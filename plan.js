@@ -62,36 +62,49 @@ module.exports = function plan(config, request) {
         const handlebarsSource = fs.readFileSync(template, { encoding: 'utf8'});
         const templateFn = handlebars.compile(handlebarsSource);
 
-        return function fetchAndGenerate() {
-            awaiting.push(new Promise((resolve, reject) => {
-                request.get(restUrl, {}, (error, response, body) => {
-                  if (error) {
-                    console.error('oops', error);
-                  }
-                  const json = JSON.parse(body);
-                  try {
-                      const flat = flatten(scan, json);
-                      flat.forEach(entry => {
-                          const {filepath,url} = renderLocation(urlTemplate, entry);
-                          const data = Object.assign({filepath,url}, extraData, entry);
-                          pages.push(data);
-                          mkdirp.sync(path.dirname(filepath));
-                          fs.writeFile(filepath, templateFn(data), { encoding: 'utf8'}, 
-                            error => { 
-                                if (error) console.error('failed to save', filepath, error); 
-                                //TODO completed promise array
-                            });
-                      });
-                      tick({ progress: indexRequest+1, msg: name||restUrl });
-                      resolve(flat);
-                  }
-                  catch(err) {
-                      reject(err);
-                      console.error(err.message, 'for', restUrl);
-                      // console.error(err); bar.interrupt()
-                  }
-              });
-            }));
+        return {
+            name,
+            restUrl,
+            urlTemplate,
+            templateFn,
+
+            reloadTemplate() {
+              const handlebarsSource = fs.readFileSync(template, { encoding: 'utf8'});
+              this.templateFn = handlebars.compile(handlebarsSource);
+            },
+
+            fetchAndGenerate() {
+              awaiting.push(
+                new Promise((resolve, reject) => {
+                  request.get(restUrl, {}, (error, response, body) => {
+                    if (error) {
+                      console.error('oops', error);
+                    }
+                    const json = JSON.parse(body);
+                    try {
+                        const flat = flatten(scan, json);
+                        flat.forEach(entry => {
+                            const {filepath,url} = renderLocation(urlTemplate, entry);
+                            const data = Object.assign({filepath,url}, extraData, entry);
+                            pages.push(data);
+                            mkdirp.sync(path.dirname(filepath));
+                            fs.writeFile(filepath, templateFn(data), { encoding: 'utf8'}, 
+                              error => { 
+                                  if (error) console.error('failed to save', filepath, error); 
+                                  //TODO completed promise array
+                              });
+                        });
+                        tick({ progress: indexRequest+1, msg: name||restUrl });
+                        resolve(flat);
+                    }
+                    catch(err) {
+                        reject(err);
+                        console.error(err.message, 'for', restUrl);
+                        // console.error(err); bar.interrupt()
+                    }
+                  });
+              }));
+            }
         };
     });
 
@@ -100,12 +113,22 @@ module.exports = function plan(config, request) {
       total: requestors.length + 3,
       pages,
       awaiting,
+
       set ticker(ticker) {
         tickers.push(ticker);
       },
 
+      renderMock(url, mockData) {
+          const requestor = requestors.find(r => r.urlTemplate.startsWith(url));
+          requestor.reloadTemplate();
+          const loc = renderLocation(requestor.urlTemplate, requestor);
+          const data = Object.assign(loc, extraData, mockData || config.mock);
+          const content = requestor.templateFn(data);
+          return content; // `Oops, not there yet.`;
+      },
+
       makePages() {
-        requestors.forEach(req => req())
+        requestors.forEach(req => req.fetchAndGenerate())
       },
 
       makeSitemap() {
